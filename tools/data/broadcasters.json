@@ -1,0 +1,496 @@
+{
+  "_doc": "LIVE EVENTS broadcaster table (9/18, owner-agreed): per pack league, the rights holders by region, as CANON network names the app's curation knows (CurationCanon Sports/Premium rows). The builder appends these to every event's `networks` so a customer's server can attach the canon channel it carries even when ESPN lists no US broadcaster (Ligue 1, Liga MX, South America, cricket, rugby, Euroleague) or only US ones (UK/EU customers). The device attaches ONLY what its server carries (NO GHOST LIVES). Weekly wrestling shows are fixed entries (day-of-week UTC, start UTC, duration) -- no reference board exists for them.",
+  "leagues": {
+    "nfl": {
+      "us": [
+        "NFL Network",
+        "NFL RedZone"
+      ],
+      "uk": [
+        "Sky Sports Main Event"
+      ],
+      "intl": [
+        "DAZN 1"
+      ]
+    },
+    "ncaaf": {
+      "us": [
+        "ESPN",
+        "ESPN2",
+        "ESPNU",
+        "SEC Network",
+        "ACC Network",
+        "Big Ten Network",
+        "FS1",
+        "CBS Sports Network"
+      ]
+    },
+    "nba": {
+      "us": [
+        "NBA TV",
+        "ESPN",
+        "TNT"
+      ],
+      "uk": [
+        "Sky Sports Main Event"
+      ]
+    },
+    "wnba": {
+      "us": [
+        "ESPN",
+        "ESPN2",
+        "ION"
+      ]
+    },
+    "ncaab": {
+      "us": [
+        "ESPN",
+        "ESPN2",
+        "ESPNU",
+        "CBS Sports Network",
+        "FS1",
+        "Big Ten Network"
+      ]
+    },
+    "mlb": {
+      "us": [
+        "MLB Network",
+        "ESPN",
+        "FS1"
+      ]
+    },
+    "nhl": {
+      "us": [
+        "NHL Network",
+        "ESPN",
+        "TNT"
+      ],
+      "uk": [
+        "Premier Sports"
+      ]
+    },
+    "mls": {
+      "us": [
+        "Apple TV+",
+        "FS1",
+        "Fox Deportes"
+      ]
+    },
+    "epl": {
+      "us": [
+        "USA Network",
+        "Peacock",
+        "NBC",
+        "Telemundo",
+        "Universo"
+      ],
+      "uk": [
+        "Sky Sports Premier League",
+        "Sky Sports Main Event",
+        "TNT Sports 1"
+      ],
+      "intl": [
+        "beIN Sports",
+        "DAZN 1"
+      ]
+    },
+    "laliga": {
+      "us": [
+        "ESPN Deportes",
+        "ESPN+"
+      ],
+      "uk": [
+        "Premier Sports"
+      ],
+      "intl": [
+        "beIN Sports",
+        "DAZN 1"
+      ]
+    },
+    "seriea": {
+      "us": [
+        "Paramount+",
+        "CBS Sports Golazo"
+      ],
+      "uk": [
+        "TNT Sports 1"
+      ],
+      "intl": [
+        "beIN Sports",
+        "DAZN 1"
+      ]
+    },
+    "bundesliga": {
+      "us": [
+        "ESPN Deportes"
+      ],
+      "uk": [
+        "Sky Sports Football"
+      ],
+      "intl": [
+        "DAZN 1",
+        "beIN Sports"
+      ]
+    },
+    "ligue1": {
+      "us": [
+        "beIN Sports"
+      ],
+      "uk": [
+        "TNT Sports 1"
+      ],
+      "intl": [
+        "beIN Sports",
+        "DAZN 1"
+      ]
+    },
+    "ucl": {
+      "us": [
+        "Paramount+",
+        "CBS Sports Golazo",
+        "TUDN",
+        "Univision"
+      ],
+      "uk": [
+        "TNT Sports 1",
+        "TNT Sports 2"
+      ],
+      "intl": [
+        "beIN Sports",
+        "DAZN 1"
+      ]
+    },
+    "uel": {
+      "us": [
+        "Paramount+",
+        "CBS Sports Golazo",
+        "TUDN"
+      ],
+      "uk": [
+        "TNT Sports 1",
+        "TNT Sports 2"
+      ],
+      "intl": [
+        "beIN Sports"
+      ]
+    },
+    "ligamx": {
+      "us": [
+        "TUDN",
+        "Univision",
+        "UniMas",
+        "Fox Deportes",
+        "Telemundo"
+      ],
+      "intl": [
+        "beIN Sports"
+      ]
+    },
+    "libertadores": {
+      "us": [
+        "beIN Sports",
+        "Fox Deportes"
+      ],
+      "intl": [
+        "beIN Sports",
+        "ESPN Deportes"
+      ]
+    },
+    "brasileirao": {
+      "us": [
+        "Fox Deportes"
+      ],
+      "intl": [
+        "beIN Sports",
+        "Premier Sports"
+      ]
+    },
+    "argentina": {
+      "us": [
+        "Fox Deportes",
+        "TyC Sports"
+      ],
+      "intl": [
+        "TyC Sports",
+        "beIN Sports"
+      ]
+    },
+    "eredivisie": {
+      "us": [
+        "ESPN+"
+      ],
+      "intl": [
+        "beIN Sports"
+      ]
+    },
+    "saudi": {
+      "us": [
+        "Fox Deportes"
+      ],
+      "intl": [
+        "DAZN 1",
+        "beIN Sports"
+      ]
+    },
+    "ufc": {
+      "us": [
+        "Paramount+",
+        "ESPN",
+        "ESPN2"
+      ],
+      "uk": [
+        "TNT Sports 1"
+      ],
+      "intl": [
+        "DAZN 1"
+      ]
+    },
+    "pfl": {
+      "us": [
+        "ESPN",
+        "ESPN2"
+      ],
+      "intl": [
+        "DAZN 1"
+      ]
+    },
+    "pga": {
+      "us": [
+        "Golf Channel",
+        "NBC",
+        "CBS",
+        "ESPN+"
+      ],
+      "uk": [
+        "Sky Sports Golf"
+      ]
+    },
+    "atp": {
+      "us": [
+        "Tennis Channel"
+      ],
+      "uk": [
+        "Sky Sports Tennis"
+      ]
+    },
+    "wta": {
+      "us": [
+        "Tennis Channel"
+      ],
+      "uk": [
+        "Sky Sports Tennis"
+      ]
+    },
+    "f1": {
+      "us": [
+        "ESPN",
+        "ESPN2",
+        "ESPNEWS",
+        "ESPN Deportes"
+      ],
+      "uk": [
+        "Sky Sports F1"
+      ],
+      "intl": [
+        "DAZN F1"
+      ]
+    },
+    "nascar": {
+      "us": [
+        "FOX",
+        "FS1",
+        "USA Network",
+        "NBC",
+        "Prime Video",
+        "TNT"
+      ]
+    },
+    "cricket_ipl": {
+      "us": [
+        "Willow Cricket"
+      ],
+      "uk": [
+        "Sky Sports Cricket"
+      ],
+      "intl": [
+        "Star Sports",
+        "Fox Cricket"
+      ]
+    },
+    "cricket_bbl": {
+      "us": [
+        "Willow Cricket"
+      ],
+      "uk": [
+        "Sky Sports Cricket"
+      ],
+      "intl": [
+        "Fox Cricket",
+        "Star Sports"
+      ]
+    },
+    "cricket_cpl": {
+      "us": [
+        "Willow Cricket"
+      ],
+      "uk": [
+        "Sky Sports Cricket"
+      ],
+      "intl": [
+        "Star Sports"
+      ]
+    },
+    "cricket_hundred": {
+      "us": [
+        "Willow Cricket"
+      ],
+      "uk": [
+        "Sky Sports Cricket"
+      ],
+      "intl": [
+        "Star Sports"
+      ]
+    },
+    "rugby_prem": {
+      "uk": [
+        "TNT Sports 1",
+        "TNT Sports 2"
+      ],
+      "intl": [
+        "Premier Sports",
+        "Sky Sports Main Event"
+      ]
+    },
+    "super_rugby": {
+      "uk": [
+        "Sky Sports Main Event"
+      ],
+      "intl": [
+        "Sky Sports Main Event",
+        "Star Sports"
+      ]
+    },
+    "urc": {
+      "uk": [
+        "Premier Sports",
+        "TNT Sports 1"
+      ],
+      "intl": [
+        "Sky Sports Main Event"
+      ]
+    },
+    "nrl": {
+      "uk": [
+        "Sky Sports Main Event"
+      ],
+      "intl": [
+        "Sky Sports Main Event"
+      ]
+    },
+    "euroleague": {
+      "us": [
+        "DAZN 1"
+      ],
+      "intl": [
+        "DAZN 1",
+        "Sky Sports Main Event"
+      ]
+    },
+    "khl": {},
+    "wwe": {
+      "us": [
+        "USA Network",
+        "Netflix",
+        "Peacock",
+        "ESPN"
+      ],
+      "uk": [
+        "TNT Sports 1",
+        "Netflix"
+      ]
+    },
+    "aew": {
+      "us": [
+        "TBS",
+        "TNT",
+        "Max"
+      ],
+      "uk": [
+        "TNT Sports 1"
+      ]
+    },
+    "boxing": {
+      "us": [
+        "DAZN Boxing",
+        "DAZN 1",
+        "ESPN",
+        "Prime Video",
+        "Netflix"
+      ],
+      "uk": [
+        "Sky Sports Main Event",
+        "TNT Sports 1",
+        "DAZN 1"
+      ]
+    }
+  },
+  "weekly_doc": "Fixed weekly shows in US Eastern time (the builder converts with its own DST rule): dowEt = ISO weekday Mon=1..Sun=7, startEt = HH:MM Eastern.",
+  "weekly": [
+    {
+      "league": "wwe",
+      "name": "WWE Raw",
+      "dowEt": 1,
+      "startEt": "20:00",
+      "hours": 3,
+      "networks": [
+        "Netflix"
+      ],
+      "tier": 2
+    },
+    {
+      "league": "wwe",
+      "name": "WWE NXT",
+      "dowEt": 2,
+      "startEt": "20:00",
+      "hours": 2,
+      "networks": [
+        "The CW"
+      ],
+      "tier": 3
+    },
+    {
+      "league": "wwe",
+      "name": "WWE SmackDown",
+      "dowEt": 5,
+      "startEt": "20:00",
+      "hours": 2,
+      "networks": [
+        "USA Network"
+      ],
+      "tier": 2
+    },
+    {
+      "league": "aew",
+      "name": "AEW Dynamite",
+      "dowEt": 3,
+      "startEt": "20:00",
+      "hours": 2,
+      "networks": [
+        "TBS"
+      ],
+      "tier": 2
+    },
+    {
+      "league": "aew",
+      "name": "AEW Collision",
+      "dowEt": 6,
+      "startEt": "20:00",
+      "hours": 2,
+      "networks": [
+        "TNT"
+      ],
+      "tier": 3
+    }
+  ],
+  "_audit": "9/18: dead names removed (Fandango at Home, KHL Prime, Match TV, Scripps Sports, Fox Sports, F1 TV: not canon display names -> never attach); bare 'Sky Sports' -> 'Sky Sports Main Event' (the exact canon name; the app's canon rung matches EXACTLY since 0.13.5)."
+}
