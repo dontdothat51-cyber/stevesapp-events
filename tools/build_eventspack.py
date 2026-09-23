@@ -15,7 +15,7 @@ ESPN boards failing = exit 1 = no publish = the last good pack stays.
     cdn/events.json.gz            the pack (gzip JSON)
     cdn/events_manifest.json      {version yyyymmddHHMM UTC, file, sha256, bytes, generatedAt, events, live, boards}
     python tools/build_eventspack.py            # build
-    python tools/publish_r2.py events --verify  # -> R2 events/<ver>/events.json.gz + events/manifest.json
+    python tools/publish_events_http.py events  # -> the server's publish door validates and stores it
 
 Pack = {version, generatedAt, boards: [{league, ok, events}], events: [
   {id, league, sport, tier, name, shortName, start (ISO UTC), status: {state: pre|in|post, detail, completed},

@@ -1,9 +1,10 @@
 # Steve's App LIVE EVENTS pack -- the always-on publisher (2026-09-22).
 # Every 5 minutes, around the clock: read ~40 public ESPN scoreboards into one gzip JSON (the events pack) and the
-# provider's event-bucket channel names into another (the slots pack) and the catalogue changes since the last run into
-# a third (the catalog pack: titles added/removed, shows changed -- state kept in the Actions cache), all read with the
-# line in SLOTS_LINE and handed to the app's server through its publish door, which validates and stores them. Devices
-# never call ESPN and never pull the provider's full lists after the first install.
+# provider's event-bucket channel names into another (the slots pack). Seven times a day (03, 10, 12, 14, 16, 18, 20 ET):
+# the catalogue changes since the last read into a third (the catalog pack: titles added/removed, shows changed -- state
+# kept in the Actions cache; the two lists are 138 MB per read, so not every five minutes). All read with the line in
+# SLOTS_LINE and handed to the app's server through its publish door, which validates and stores them. Devices never
+# call ESPN and never pull the provider's full lists after the first install.
 # Two triggers: GitHub's own cron (best effort, may lag) and workflow_dispatch fired by the server's own clock every
 # 5 minutes. The door skips an older-or-same version, so overlapping runs never fight.
 # Secrets: EVENTS_PUBLISH_KEY (single-purpose: it can publish a pack and nothing else) and SLOTS_LINE (a provider login
@@ -22,6 +23,14 @@ jobs:
     timeout-minutes: 14
     steps:
       - uses: actions/checkout@v4
+      # 9/23 PHASE 1 (audit): the catalogue-hour gate runs FIRST, so a slow provider read above it (3 x 180 s timeouts on
+      # the slots build) can never push the decision past the five-minute window and lose that hour's read.
+      - name: Is this a catalogue hour? (seven reads a day, not 288 -- the two lists are 138 MB per read)
+        id: gate
+        run: |
+          H=$(TZ=America/New_York date +%H); M=$((10#$(TZ=America/New_York date +%M)))
+          case "$H" in 03|10|12|14|16|18|20) hour=1;; *) hour=0;; esac
+          if [ "$hour" = 1 ] && [ "$M" -lt 5 ]; then echo "catalog=true" >> "$GITHUB_OUTPUT"; echo "ET $H:$M -> catalogue read this run"; else echo "catalog=false" >> "$GITHUB_OUTPUT"; echo "ET $H:$M -> no catalogue this run"; fi
       - name: Build the events pack from the ESPN boards
         run: python3 tools/build_eventspack.py
       - name: Publish through the server's publish door
@@ -29,25 +38,32 @@ jobs:
           EVENTS_PUBLISH_KEY: ${{ secrets.EVENTS_PUBLISH_KEY }}
         run: python3 tools/publish_events_http.py events
       - name: Build the slots pack (provider channel names)
+        id: slots
+        # 9/23 PHASE 1: the provider answered 502 here in 6 of 100 runs; that must not skip the catalogue below.
+        # The builder still publishes nothing for slots on a bad read, and the run is marked failed at the end.
+        continue-on-error: true
         env:
           SLOTS_LINE: ${{ secrets.SLOTS_LINE }}
         run: python3 tools/build_slotspack.py
       - name: Publish the slots pack
+        if: steps.slots.outcome == 'success'
         env:
           EVENTS_PUBLISH_KEY: ${{ secrets.EVENTS_PUBLISH_KEY }}
         run: python3 tools/publish_events_http.py slots
       - name: Restore the catalogue state from the last run
+        if: steps.gate.outputs.catalog == 'true'
         uses: actions/cache/restore@v4
         with:
           path: cdn-build/catalog_state.json.gz
           key: catalog-state-${{ github.run_id }}
           restore-keys: catalog-state-
       - name: Build the catalogue pack (what changed since the last run)
+        if: steps.gate.outputs.catalog == 'true'
         env:
           SLOTS_LINE: ${{ secrets.SLOTS_LINE }}
         run: python3 tools/build_catalogpack.py
       - name: Save the catalogue state for the next run
-        if: always()
+        if: always() && steps.gate.outputs.catalog == 'true'
         uses: actions/cache/save@v4
         with:
           path: cdn-build/catalog_state.json.gz
@@ -59,3 +75,6 @@ jobs:
         run: python3 tools/publish_events_http.py catalog
       - name: Receipt
         run: python3 -c "import json; m=json.load(open('cdn/events_manifest.json')); print('events pack', m['version'], m['events'], 'events,', m['live'], 'live, boards failed:', m['failed'])"
+      - name: Slots read failed this run (the provider answered badly; nothing was published for slots; the catalogue still ran)
+        if: steps.slots.outcome == 'failure'
+        run: exit 1

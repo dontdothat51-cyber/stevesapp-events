@@ -5,7 +5,9 @@ mirrored every few minutes by the always-on builder so devices never poll the pr
 One line (env SLOTS_LINE = "server|user|pass") makes two catalog calls (get_live_categories, get_live_streams) -- list
 reads, never a stream, so the account's single connection stays free. Event buckets = a category whose name carries
 PPV/EVENT/REPLAY words, or whose names are mostly time-prefixed (the app's own rule, EventParser.isEventBucket).
-Output: cdn/slots.json.gz  {version, generatedAt, buckets:[{id,name}], slots:[[streamId, categoryId, name], ...]}
+Output: cdn/slots.json.gz  {version, generatedAt, buckets:[{id}], slots:[[streamId, categoryId, name], ...]}
+        (9/23 PHASE 1: bucket NAMES are not published -- the device never reads them; it takes its bucket ids from its own
+        library -- so the provider's category names stay out of our storage)
         cdn/slots_manifest.json  {version, file, sha256, bytes, generatedAt, slots, buckets}
 A provider error (auth, busy, 5xx) exits non-zero and writes NOTHING -- the last good pack stays; the builder never
 retries in a loop (the next scheduled run is the retry).
@@ -64,7 +66,7 @@ def main():
     slots.sort()
     now = dt.datetime.now(dt.timezone.utc)
     ver = now.strftime("%Y%m%d%H%M")
-    pack = {"version": ver, "generatedAt": now.strftime("%Y-%m-%dT%H:%M:%SZ"), "buckets": buckets, "slots": slots}
+    pack = {"version": ver, "generatedAt": now.strftime("%Y-%m-%dT%H:%M:%SZ"), "buckets": [{"id": b["id"]} for b in buckets], "slots": slots}
     gz = gzip.compress(json.dumps(pack, ensure_ascii=False, separators=(",", ":")).encode("utf-8"), mtime=0)
     open(os.path.join(CDN, "slots.json.gz"), "wb").write(gz)
     man = {"version": ver, "file": "slots.json.gz", "sha256": hashlib.sha256(gz).hexdigest(), "bytes": len(gz),
