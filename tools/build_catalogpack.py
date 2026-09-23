@@ -19,7 +19,7 @@ CDN = os.path.join(ROOT, "cdn"); os.makedirs(CDN, exist_ok=True)
 STATE_DIR = os.path.join(ROOT, "cdn-build"); os.makedirs(STATE_DIR, exist_ok=True)
 STATE = os.path.join(STATE_DIR, "catalog_state.json.gz")
 UA = "Mozilla/5.0 (Linux; Android) StevesApp"
-MAX_ADDED = 20000   # more than this in one diff = a lost state or a provider swap, never a real 5-minute change
+MAX_ADDED = 5000    # more than this in one diff = a lost state or a provider swap, never a real 5-minute change (audit: keeps the Stick's parse small)
 
 
 def api(base, user, pw, action):
