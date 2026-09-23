@@ -264,7 +264,10 @@ def weekly_shows():
             state = "in" if start <= now < end else "post" if now >= end else "pre"
             out.append({"id": "weekly:" + slug(w["name"]) + ":" + d.isoformat(), "league": w["league"], "sport": "wrestling", "tier": int(w.get("tier", 3)),
                         "name": w["name"], "shortName": w["name"], "start": iso(start), "end": iso(end), "status": {"state": state, "detail": "weekly", "completed": state == "post"},
-                        "teams": [], "broadcasters": list(w.get("networks", [])), "networks": list(dict.fromkeys(list(w.get("networks", [])) + table_networks(w["league"]))), "source": "weekly"})
+                        "teams": [], "broadcasters": list(w.get("networks", [])), "networks": list(w.get("networks", [])),
+                        # 0.14.10 (owner diag 9/22, NXT fronted by TNT Sports 1 then ESPN): a weekly show names its OWN channel only
+                        # (NXT = The CW, Raw = Netflix); the league's rights table is a HINT, never an authoritative network
+                        "hints": table_networks(w["league"]), "source": "weekly"})
     return out
 
 # ---- Wikipedia: WWE / AEW premium events, boxing majors --------------------------------------------------------------
