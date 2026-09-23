@@ -4,8 +4,9 @@
 # and hand both to the app's server through its publish door, which validates and stores them. Devices never call ESPN
 # and never poll the provider for names.
 # Two triggers: GitHub's own cron (best effort, may lag) and workflow_dispatch fired by the server's own clock every
-# 10 minutes. The door skips an older-or-same version, so overlapping runs never fight.
-# Secret required: EVENTS_PUBLISH_KEY (single-purpose: it can publish an events pack and nothing else).
+# 5 minutes. The door skips an older-or-same version, so overlapping runs never fight.
+# Secrets: EVENTS_PUBLISH_KEY (single-purpose: it can publish a pack and nothing else) and SLOTS_LINE (a provider login
+# used only to read channel names; never printed).
 name: events
 on:
   schedule:
@@ -17,7 +18,7 @@ concurrency:
 jobs:
   events-pack:
     runs-on: ubuntu-latest
-    timeout-minutes: 8
+    timeout-minutes: 14
     steps:
       - uses: actions/checkout@v4
       - name: Build the events pack from the ESPN boards
