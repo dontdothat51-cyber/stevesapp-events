@@ -313,7 +313,7 @@ def wiki_events(title, league, tier, default_start_et, hours, name_rx):
         state = "in" if start <= now < end else "post" if now >= end else "pre"
         out.append({"id": f"wiki:{league}:{slug(name)}:{d.isoformat()}", "league": league, "sport": "wrestling" if league in ("wwe", "aew") else "boxing",
                     "tier": tier, "name": name, "shortName": name, "start": iso(start), "status": {"state": state, "detail": "wikipedia", "completed": state == "post"},
-                    "teams": [], "broadcasters": [], "networks": table_networks(league), "source": "wiki"})
+                    "teams": [], "broadcasters": [], "networks": [], "hints": table_networks(league), "source": "wiki"})   # 0.14.10 audit: the table is a hint
     return out
 
 def wiki_boards():
@@ -362,7 +362,7 @@ def dazn_boxing():
             state = "in" if start <= now < end else "post" if now >= end else "pre"
             out.append({"id": "dazn:" + k, "league": "boxing", "sport": "boxing", "tier": 2, "name": name, "shortName": name, "start": iso(start),
                         "status": {"state": state, "detail": "dazn schedule", "completed": state == "post"}, "teams": [],
-                        "broadcasters": ["DAZN"], "networks": list(dict.fromkeys(["DAZN 1", "DAZN Boxing"] + table_networks("boxing"))), "source": "dazn"})
+                        "broadcasters": ["DAZN"], "networks": ["DAZN 1", "DAZN Boxing"], "hints": table_networks("boxing"), "source": "dazn"})   # 0.14.10 audit
     return out
 
 # ---- main ----------------------------------------------------------------------------------------------------------
