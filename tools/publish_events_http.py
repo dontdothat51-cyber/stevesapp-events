@@ -15,7 +15,7 @@ DOOR = os.environ.get("EVENTS_PUBLISH_URL", "https://stevesapp.tv/v1/events/publ
 
 
 def main():
-    kind = sys.argv[1] if len(sys.argv) > 1 and sys.argv[1] in ("events", "slots") else "events"   # 9/23: the SLOTS pack rides the same door
+    kind = sys.argv[1] if len(sys.argv) > 1 and sys.argv[1] in ("events", "slots", "catalog") else "events"   # 9/23: slots + catalog ride the same door
     door = DOOR.replace("/v1/events/publish", f"/v1/{kind}/publish")
     key = os.environ.get("EVENTS_PUBLISH_KEY", "").strip()
     if not key:
@@ -26,7 +26,7 @@ def main():
     gen = dt.datetime.strptime(man["generatedAt"][:19], "%Y-%m-%dT%H:%M:%S").replace(tzinfo=dt.timezone.utc)
     age_min = (dt.datetime.now(dt.timezone.utc) - gen).total_seconds() / 60
     if age_min > 30:
-        print(f"::error::events pack is {age_min:.0f} min old -- not publishing"); sys.exit(1)
+        print(f"::error::{kind} pack is {age_min:.0f} min old -- not publishing"); sys.exit(1)
     if man.get("boards") and len(man.get("failed") or []) * 2 > int(man["boards"]):
         print(f"::error::{len(man['failed'])}/{man['boards']} boards failed -- not publishing"); sys.exit(1)
     req = urllib.request.Request(door, data=body, method="POST", headers={
@@ -43,7 +43,10 @@ def main():
     except Exception as e:  # audit: DNS / timeout / refused -> a clean annotation, not a traceback
         print(f"::error::publish door unreachable: {type(e).__name__} {str(e)[:160]}"); sys.exit(1)
     if out.get("ok"):
-        print(f"published {kind} {out['published']} (replaced {out.get('replaced') or '-'}) -- " + (f"{man['events']} events, {man['live']} live, failed {man['failed']}" if kind == "events" else f"{man['slots']} slots in {man['buckets']} buckets"))
+        detail = (f"{man['events']} events, {man['live']} live, failed {man['failed']}" if kind == "events"
+                  else f"{man['slots']} slots in {man['buckets']} buckets" if kind == "slots"
+                  else f"+{man['movies_added']}/-{man['movies_removed']} movies, +{man['series_added']}/-{man['series_removed']} series, {man['series_changed']} shows changed")
+        print(f"published {kind} {out['published']} (replaced {out.get('replaced') or '-'}) -- {detail}")
     else:
         print(f"skipped: {out.get('skipped')} (published {out.get('published')})")
 
