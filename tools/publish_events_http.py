@@ -15,10 +15,12 @@ DOOR = os.environ.get("EVENTS_PUBLISH_URL", "https://stevesapp.tv/v1/events/publ
 
 
 def main():
+    kind = sys.argv[1] if len(sys.argv) > 1 and sys.argv[1] in ("events", "slots") else "events"   # 9/23: the SLOTS pack rides the same door
+    door = DOOR.replace("/v1/events/publish", f"/v1/{kind}/publish")
     key = os.environ.get("EVENTS_PUBLISH_KEY", "").strip()
     if not key:
         print("::error::EVENTS_PUBLISH_KEY not set"); sys.exit(1)
-    man = json.load(open(os.path.join(CDN, "events_manifest.json"), encoding="utf-8"))
+    man = json.load(open(os.path.join(CDN, f"{kind}_manifest.json"), encoding="utf-8"))
     body = open(os.path.join(CDN, man["file"]), "rb").read()
     # the same guard the private publisher applies: never ship a stale or broken pack
     gen = dt.datetime.strptime(man["generatedAt"][:19], "%Y-%m-%dT%H:%M:%S").replace(tzinfo=dt.timezone.utc)
@@ -27,7 +29,7 @@ def main():
         print(f"::error::events pack is {age_min:.0f} min old -- not publishing"); sys.exit(1)
     if man.get("boards") and len(man.get("failed") or []) * 2 > int(man["boards"]):
         print(f"::error::{len(man['failed'])}/{man['boards']} boards failed -- not publishing"); sys.exit(1)
-    req = urllib.request.Request(DOOR, data=body, method="POST", headers={
+    req = urllib.request.Request(door, data=body, method="POST", headers={
         "x-events-key": key,
         "x-events-manifest": json.dumps(man, separators=(",", ":")),
         "content-type": "application/gzip",
@@ -41,7 +43,7 @@ def main():
     except Exception as e:  # audit: DNS / timeout / refused -> a clean annotation, not a traceback
         print(f"::error::publish door unreachable: {type(e).__name__} {str(e)[:160]}"); sys.exit(1)
     if out.get("ok"):
-        print(f"published events {out['published']} (replaced {out.get('replaced') or '-'}) -- {man['events']} events, {man['live']} live, failed {man['failed']}")
+        print(f"published {kind} {out['published']} (replaced {out.get('replaced') or '-'}) -- " + (f"{man['events']} events, {man['live']} live, failed {man['failed']}" if kind == "events" else f"{man['slots']} slots in {man['buckets']} buckets"))
     else:
         print(f"skipped: {out.get('skipped')} (published {out.get('published')})")
 

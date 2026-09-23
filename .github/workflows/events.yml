@@ -1,13 +1,15 @@
 # Steve's App LIVE EVENTS pack -- the always-on publisher (2026-09-22).
-# Every 10 minutes, around the clock: read ~40 public ESPN scoreboards, normalize to one gzip JSON, and hand it to the
-# app's server through its publish door, which validates it and stores only the events files. Devices never call ESPN.
+# Every 5 minutes, around the clock: read ~40 public ESPN scoreboards into one gzip JSON (the events pack) and the
+# provider's event-bucket channel names into another (the slots pack, one catalog read with the line in SLOTS_LINE),
+# and hand both to the app's server through its publish door, which validates and stores them. Devices never call ESPN
+# and never poll the provider for names.
 # Two triggers: GitHub's own cron (best effort, may lag) and workflow_dispatch fired by the server's own clock every
 # 10 minutes. The door skips an older-or-same version, so overlapping runs never fight.
 # Secret required: EVENTS_PUBLISH_KEY (single-purpose: it can publish an events pack and nothing else).
 name: events
 on:
   schedule:
-    - cron: '*/10 * * * *'
+    - cron: '*/5 * * * *'
   workflow_dispatch: {}
 concurrency:
   group: events-pack
@@ -23,6 +25,14 @@ jobs:
       - name: Publish through the server's publish door
         env:
           EVENTS_PUBLISH_KEY: ${{ secrets.EVENTS_PUBLISH_KEY }}
-        run: python3 tools/publish_events_http.py
+        run: python3 tools/publish_events_http.py events
+      - name: Build the slots pack (provider channel names)
+        env:
+          SLOTS_LINE: ${{ secrets.SLOTS_LINE }}
+        run: python3 tools/build_slotspack.py
+      - name: Publish the slots pack
+        env:
+          EVENTS_PUBLISH_KEY: ${{ secrets.EVENTS_PUBLISH_KEY }}
+        run: python3 tools/publish_events_http.py slots
       - name: Receipt
         run: python3 -c "import json; m=json.load(open('cdn/events_manifest.json')); print('events pack', m['version'], m['events'], 'events,', m['live'], 'live, boards failed:', m['failed'])"
