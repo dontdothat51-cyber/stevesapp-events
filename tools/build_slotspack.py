@@ -6,6 +6,7 @@ One line (env SLOTS_LINE = "server|user|pass") makes two catalog calls (get_live
 reads, never a stream, so the account's single connection stays free. Event buckets = a category whose name carries
 PPV/EVENT/REPLAY words, or whose names are mostly time-prefixed (the app's own rule, EventParser.isEventBucket).
 Output: cdn/slots.json.gz  {version, generatedAt, buckets:[{id}], slots:[[streamId, categoryId, name], ...]}
+        (9/23 PHASE 3: the provider brand phrase is stripped from every published name -- strip_brand)
         (9/23 PHASE 1: bucket NAMES are not published -- the device never reads them; it takes its bucket ids from its own
         library -- so the provider's category names stay out of our storage)
         cdn/slots_manifest.json  {version, file, sha256, bytes, generatedAt, slots, buckets}
@@ -19,6 +20,38 @@ CDN = os.path.join(ROOT, "cdn"); os.makedirs(CDN, exist_ok=True)
 BUCKET_WORDS = re.compile(r"(?i)\b(PPV|EVENT|EVENTS|REPLAY|REPLAYS|PAY PER VIEW)\b")
 TIME_PREFIX = re.compile(r"^\s*(\d{1,2})[:.](\d{2})\s+(?=\S)")
 UA = "Mozilla/5.0 (Linux; Android) StevesApp"
+
+
+# 9/23 PHASE 3: the provider's brand phrase is not part of a channel's name, and it must not sit in our storage naming
+# the provider. Stripped here, before publishing -- the SAME rule the app applies at every live-name write and on both
+# sides of its pack compare (app-tv/.../Brand.kt, shipped in 0.15.2 / vc 139). Order mattered: the app half had to reach
+# every device that reads this pack (vc >= 135) FIRST, or a stripped pack would fail their byte-for-byte name check and
+# be refused for good. Proven on the owner's Stick 9/23: "8892 brand-stripped" on the first tick, 0 after, the pack
+# still accepted at 98 % agreement. Segment-level only: a bare "8K" is a quality tag and "8KANAL" is a real channel.
+_PHRASE = "8K EXCLUSIVE"
+_INNER = re.compile(r"\s*-\s*8K\s+EXCLUSIVE(?=\s*-|\s*$)", re.I)
+_LEAD = re.compile(r"^\s*8K\s+EXCLUSIVE\s*-\s*", re.I)
+
+
+def strip_brand(name):
+    """Byte-for-byte the same rule as Brand.strip in the app; a name without the phrase is returned unchanged."""
+    if _PHRASE.lower() not in name.lower():
+        return name
+    touched = False
+    parts = []
+    for raw in name.split("|"):
+        seg = raw.strip()
+        if seg.lower() == _PHRASE.lower():
+            touched = True
+            continue
+        t = _LEAD.sub("", _INNER.sub("", seg)).strip()
+        if t != seg:
+            touched = True
+        if t:
+            parts.append(t)
+    if not touched:
+        return name
+    return " | ".join(parts) or name
 
 
 def api(base, user, pw, action):
@@ -62,7 +95,7 @@ def main():
         if cid not in bucket_ids: continue
         try: sid = int(s.get("stream_id"))
         except Exception: continue
-        slots.append([sid, cid, str(s.get("name") or "")])
+        slots.append([sid, cid, strip_brand(str(s.get("name") or ""))])   # 9/23 PHASE 3
     slots.sort()
     now = dt.datetime.now(dt.timezone.utc)
     ver = now.strftime("%Y%m%d%H%M")
