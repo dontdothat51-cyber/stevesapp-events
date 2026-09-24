@@ -61,6 +61,23 @@ BOARDS = {
     "ucl":        ("soccer", "uefa.champions", 1, "", True),
     "uel":        ("soccer", "uefa.europa", 2, "", True),
     "ligamx":     ("soccer", "mex.1", 2, "", True),
+    # 9/24 NATIONS (owner: six Nations League games on the server, none on Live Now -- no international board existed).
+    # Every league below keys its teams through the ONE national roster (team_keys.json["national"], crest pack
+    # teams-national); keep this set in step with LogoVault.NATIONAL on the Stick and NATIONAL_SOURCES in build_teamvault.
+    "uefa_nations":     ("soccer", "uefa.nations", 1, "", True),
+    "wcq_uefa":         ("soccer", "fifa.worldq.uefa", 1, "", True),
+    "wcq_conmebol":     ("soccer", "fifa.worldq.conmebol", 1, "", True),
+    "wcq_concacaf":     ("soccer", "fifa.worldq.concacaf", 1, "", True),
+    "wcq_afc":          ("soccer", "fifa.worldq.afc", 3, "", True),
+    "wcq_caf":          ("soccer", "fifa.worldq.caf", 3, "", True),
+    "concacaf_nations": ("soccer", "concacaf.nations.league", 2, "", True),
+    "world_cup":        ("soccer", "fifa.world", 1, "", True),
+    "euro":             ("soccer", "uefa.euro", 1, "", True),
+    "copa_america":     ("soccer", "conmebol.america", 1, "", True),
+    "gold_cup":         ("soccer", "concacaf.gold", 2, "", True),
+    "afcon":            ("soccer", "caf.nations", 2, "", True),
+    "asian_cup":        ("soccer", "afc.asian.cup", 3, "", True),
+    "friendlies":       ("soccer", "fifa.friendly", 3, "", True),
     "libertadores": ("soccer", "conmebol.libertadores", 2, "", True),
     "brasileirao": ("soccer", "bra.1", 3, "", True),
     "argentina":  ("soccer", "arg.1", 3, "", True),
@@ -176,9 +193,12 @@ def status_of(st):
     return {"state": st.get("state") or "pre", "detail": st.get("shortDetail") or st.get("detail") or "", "completed": bool(st.get("completed"))}
 
 # ---- ESPN -----------------------------------------------------------------------------------------------------
+NATIONAL = {"uefa_nations", "wcq_uefa", "wcq_conmebol", "wcq_concacaf", "wcq_afc", "wcq_caf", "concacaf_nations",
+            "world_cup", "euro", "copa_america", "gold_cup", "afcon", "asian_cup", "friendlies"}
+
 def espn_board(league):
     sport, lg, tier, extra, has_teams = BOARDS[league]
-    keys = KEYS.get(league, {})
+    keys = KEYS.get("national" if league in NATIONAL else league, {})   # 9/24 NATIONS: one roster for every international board
     out, seen = [], set()
     raw_events = []
     for day in eastern_days():

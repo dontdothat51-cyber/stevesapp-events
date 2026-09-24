@@ -432,6 +432,158 @@
         "TNT Sports 1",
         "DAZN 1"
       ]
+    },
+    "uefa_nations": {
+      "us": [
+        "FS1",
+        "FS2",
+        "TUDN",
+        "UniMás"
+      ],
+      "uk": [
+        "Premier Sports 1"
+      ],
+      "intl": [
+        "DAZN 1"
+      ]
+    },
+    "wcq_uefa": {
+      "us": [
+        "FS1",
+        "FS2",
+        "TUDN",
+        "UniMás"
+      ],
+      "uk": [
+        "Premier Sports 1"
+      ],
+      "intl": [
+        "DAZN 1"
+      ]
+    },
+    "wcq_conmebol": {
+      "us": [
+        "TUDN",
+        "UniMás",
+        "Fox Deportes"
+      ],
+      "intl": [
+        "beIN Sports"
+      ]
+    },
+    "wcq_concacaf": {
+      "us": [
+        "Paramount+",
+        "CBS Sports Golazo",
+        "TUDN",
+        "Univision",
+        "Telemundo",
+        "Universo"
+      ],
+      "intl": []
+    },
+    "wcq_afc": {
+      "us": [
+        "Paramount+"
+      ],
+      "intl": []
+    },
+    "wcq_caf": {
+      "us": [],
+      "intl": [
+        "beIN Sports"
+      ]
+    },
+    "concacaf_nations": {
+      "us": [
+        "Paramount+",
+        "CBS Sports Golazo",
+        "TUDN",
+        "Univision",
+        "Telemundo",
+        "Universo"
+      ],
+      "intl": []
+    },
+    "world_cup": {
+      "us": [
+        "FS1",
+        "FS2",
+        "Telemundo",
+        "Universo",
+        "Peacock"
+      ],
+      "uk": [
+        "BBC One",
+        "ITV1"
+      ],
+      "intl": [
+        "beIN Sports"
+      ]
+    },
+    "euro": {
+      "us": [
+        "FS1",
+        "FS2",
+        "TUDN",
+        "UniMás"
+      ],
+      "uk": [
+        "BBC One",
+        "ITV1"
+      ],
+      "intl": [
+        "beIN Sports"
+      ]
+    },
+    "copa_america": {
+      "us": [
+        "FS1",
+        "FS2",
+        "TUDN",
+        "UniMás"
+      ],
+      "intl": [
+        "beIN Sports"
+      ]
+    },
+    "gold_cup": {
+      "us": [
+        "FS1",
+        "FS2",
+        "TUDN",
+        "UniMás"
+      ],
+      "intl": []
+    },
+    "afcon": {
+      "us": [
+        "beIN Sports"
+      ],
+      "uk": [
+        "Sky Sports Main Event"
+      ],
+      "intl": [
+        "beIN Sports"
+      ]
+    },
+    "asian_cup": {
+      "us": [
+        "Paramount+"
+      ],
+      "intl": [
+        "beIN Sports"
+      ]
+    },
+    "friendlies": {
+      "us": [
+        "TNT",
+        "truTV",
+        "TUDN",
+        "UniMás",
+        "Telemundo"
+      ],
+      "intl": []
     }
   },
   "weekly_doc": "Fixed weekly shows in US Eastern time (the builder converts with its own DST rule): dowEt = ISO weekday Mon=1..Sun=7, startEt = HH:MM Eastern.",
@@ -492,5 +644,5 @@
       "tier": 3
     }
   ],
-  "_audit": "9/18: dead names removed (Fandango at Home, KHL Prime, Match TV, Scripps Sports, Fox Sports, F1 TV: not canon display names -> never attach); bare 'Sky Sports' -> 'Sky Sports Main Event' (the exact canon name; the app's canon rung matches EXACTLY since 0.13.5)."
+  "_audit": "9/18: dead names removed (Fandango at Home, KHL Prime, Match TV, Scripps Sports, Fox Sports, F1 TV: not canon display names -> never attach); bare 'Sky Sports' -> 'Sky Sports Main Event' (the exact canon name; the app's canon rung matches EXACTLY since 0.13.5). | 9/24 NATIONS: 14 international boards added (hints only; the app ignores hints until the only-live-game rule ships); names kept to CurationCanon spellings the app already knows."
 }
