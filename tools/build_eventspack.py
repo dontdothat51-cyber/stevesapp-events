@@ -41,6 +41,9 @@ def _load(name, required):
         print(f"::warning::{name} unreadable ({e}) -- continuing without it"); return {}
 KEYS = _load("team_keys.json", required=True)
 TABLE = _load("broadcasters.json", required=False)
+# 9/25 (Sye 1: "Cubs at Red Sox" listed only Marquee; his Marquee feed was dead while NESN sat unused): a team's regional
+# network is a PER-GAME fact (that team is playing), unlike the league table -- it joins `networks`, never `hints`.
+RSN = _load("rsn.json", required=False) or {}
 if "leagues" not in TABLE: TABLE = {"leagues": {}, "weekly": []}
 
 # league -> (sport, espn league, tier, extra query, has teams). Tier: 1 = headline (row order), 3 = filler.
@@ -230,6 +233,9 @@ def espn_board(league):
                 teams.append({"key": keys.get(tid) or slug(t.get("displayName")), "id": tid, "abbr": t.get("abbreviation") or "",
                               "name": t.get("displayName") or "", "home": cp.get("homeAway") == "home", "keyed": tid in keys})
         raw, nets = networks_of(c, league)
+        for t in teams:   # 9/25: both teams' regional networks (rsn.json), after the reference's own names
+            for n in (RSN.get(league) or {}).get(t.get("key") or "", []):
+                if n not in nets: nets.append(n)
         ev = {"id": "espn:" + str(e.get("id")), "league": league, "sport": sport, "tier": tier,
               "name": e.get("name") or "", "shortName": e.get("shortName") or "",
               "start": (e.get("date") if (len(comps) > 1 and not has_teams) else None) or c.get("date") or e.get("date") or "", "status": status_of(st),
