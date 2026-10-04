@@ -15,7 +15,8 @@ DOOR = os.environ.get("EVENTS_PUBLISH_URL", "https://stevesapp.tv/v1/events/publ
 
 
 def main():
-    kind = sys.argv[1] if len(sys.argv) > 1 and sys.argv[1] in ("events", "slots", "catalog") else "events"   # 9/23: slots + catalog ride the same door
+    # 9/23: slots + catalog ride the same door; 10/4 (0.17.44): the family builder's categories (cats) and channel guide (chguide)
+    kind = sys.argv[1] if len(sys.argv) > 1 and sys.argv[1] in ("events", "slots", "catalog", "cats", "chguide") else "events"
     door = DOOR.replace("/v1/events/publish", f"/v1/{kind}/publish")
     key = os.environ.get("EVENTS_PUBLISH_KEY", "").strip()
     if not key:
@@ -45,6 +46,8 @@ def main():
     if out.get("ok"):
         detail = (f"{man['events']} events, {man['live']} live, failed {man['failed']}" if kind == "events"
                   else f"{man['slots']} slots in {man['buckets']} buckets" if kind == "slots"
+                  else f"{man['family']}: " + ("unchanged (checked)" if out.get("unchanged") else "ids " + ", ".join(f"{k} {v}" for k, v in man['counts'].items())) if kind == "cats"
+                  else f"{man['family']}: {man['keys']} guide ids, {man['streams']} channels, {man['progs']} programmes" if kind == "chguide"
                   else f"+{man['movies_added']}/-{man['movies_removed']} movies, +{man['series_added']}/-{man['series_removed']} series, {man['series_changed']} shows changed")
         print(f"published {kind} {out['published']} (replaced {out.get('replaced') or '-'}) -- {detail}")
     else:

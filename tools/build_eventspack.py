@@ -242,7 +242,39 @@ def espn_board(league):
               "teams": teams, "broadcasters": raw, "networks": nets, "hints": hints_of(league), "source": "espn"}
         if end_iso: ev["end"] = end_iso
         out.append(ev)
+    if league in NATIONAL: demote_umbrellas(out)
     return out
+
+def _start_of(e):
+    try: return dt.datetime.strptime(e["start"][:16], "%Y-%m-%dT%H:%M").replace(tzinfo=dt.timezone.utc)
+    except Exception: return None
+
+def demote_umbrellas(events):
+    """BUILD 1 A1 (docs/BUILD1_AUDIT_2026-10-04.md; owner 10/3: Belize-French Guiana on UNCONFIRMED CBS Sports Golazo): on a
+    national-team board, a network ESPN names on 2+ games that are on at the same time (not finished, kickoffs within 2 h of
+    each other) is the competition's rights umbrella (Golazo / Paramount+ on every Nations League game), not a per-game fact.
+    It leaves BOTH `networks` and `broadcasters` (the app's ghost rule exempts either list, EventEngine.kt perGame) and
+    travels as a `hint`, which the app attaches only to the league's only live game and only with a guide listing.
+    RSN names are team-owned (never on two games) and untouched; NFL/MLB are not national boards."""
+    live = [(e, _start_of(e)) for e in events if (e.get("status") or {}).get("state") != "post"]
+    live = [(e, s) for e, s in live if s is not None]
+    demoted = 0
+    # every pair judged on the ORIGINAL lists first (demoting game 1 must not hide the shared name from game 2)
+    shares = []
+    for e, s in live:
+        shared = set()
+        for f, t in live:
+            if f is e or abs((s - t).total_seconds()) > 2 * 3600: continue
+            shared |= set(e["networks"]) & set(f["networks"])
+        shares.append((e, shared))
+    for e, shared in shares:
+        if not shared: continue
+        e["networks"] = [n for n in e["networks"] if n not in shared]
+        e["broadcasters"] = [n for n in e["broadcasters"] if BROADCASTERS.get(n, n) not in shared and n not in shared]
+        e["hints"] = list(dict.fromkeys(list(e.get("hints") or []) + sorted(shared)))
+        demoted += 1
+    if demoted: print(f"  umbrella rule: {demoted} {events[0]['league'] if events else ''} games lost a shared network to hints")
+    return events
 
 # ---- KHL (official public feed) ----------------------------------------------------------------------------------
 def khl_board():

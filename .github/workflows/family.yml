@@ -1,0 +1,99 @@
+# Steve's App FAMILY BUILDER (2026-10-04). Every 10 minutes, for each provider family that has a builder line:
+#   episode lists : the series the family's boxes opened (and the catalogue's added/changed shows), read once each
+#                   (get_series_info), <= 150 per run, 1 call / 2 s, handed to the server's door;
+#   categories    : hourly (the run in minutes 00-09 UTC), three list reads, published as ids + signatures (no names);
+#   channel guide : a trickle of <= 90 guide reads per run (1 call / 2 s; each guide id twice a day; empties sleep a
+#                   week), published twice a day (09 and 21 UTC).
+# List reads only -- never a stream. One run at a time (the concurrency group below). The slots/catalogue reads in
+# events.yml are 3 calls per 5 minutes from their own runner. Logs print counts only.
+# Families: k8 = SLOTS_LINE; flux = FLUX_LINE -- absent = that family is skipped and its boxes keep asking their
+# own provider (the server answers 404 for it). Same pace and caps for both.
+# Secrets: EVENTS_PUBLISH_KEY (single-purpose door key), SLOTS_LINE, FLUX_LINE.
+name: family
+on:
+  schedule:
+    - cron: '*/10 * * * *'
+  workflow_dispatch:
+    inputs:
+      guide_publish:
+        description: 'Publish the channel guide this run (normally 09 and 21 UTC)'
+        type: boolean
+        default: false
+concurrency:
+  group: provider-builder
+  cancel-in-progress: false
+jobs:
+  family:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - name: Restore the builder state (guide clocks + listings)
+        uses: actions/cache/restore@v4
+        with:
+          path: cdn-build/family
+          key: family-state-${{ github.run_id }}
+          restore-keys: family-state-
+      - name: k8 episode lists
+        id: eps_k8
+        continue-on-error: true
+        env:
+          SLOTS_LINE: ${{ secrets.SLOTS_LINE }}
+          EVENTS_PUBLISH_KEY: ${{ secrets.EVENTS_PUBLISH_KEY }}
+        run: python3 tools/build_eps.py --family k8 --line-env SLOTS_LINE --max-calls 150 --budget-s 300
+      - name: k8 categories (hourly)
+        id: cats_k8
+        continue-on-error: true
+        env:
+          SLOTS_LINE: ${{ secrets.SLOTS_LINE }}
+          EVENTS_PUBLISH_KEY: ${{ secrets.EVENTS_PUBLISH_KEY }}
+        run: |
+          M=$((10#$(date -u +%M)))
+          if [ "$M" -ge 10 ]; then echo "not the categories slot (minute $M)"; exit 0; fi
+          python3 tools/build_cats.py --family k8 --line-env SLOTS_LINE
+          if [ -f cdn/cats_manifest.json ]; then python3 tools/publish_events_http.py cats; fi
+      - name: k8 channel guide (trickle)
+        id: guide_k8
+        continue-on-error: true
+        env:
+          SLOTS_LINE: ${{ secrets.SLOTS_LINE }}
+          EVENTS_PUBLISH_KEY: ${{ secrets.EVENTS_PUBLISH_KEY }}
+        run: |
+          python3 tools/build_famguide.py --family k8 --line-env SLOTS_LINE --max-calls 90 --budget-s 190 ${{ inputs.guide_publish && '--force-publish' || '' }}
+          if [ -f cdn/chguide_manifest.json ]; then python3 tools/publish_events_http.py chguide; fi
+      - name: flux episode lists
+        id: eps_flux
+        continue-on-error: true
+        env:
+          FLUX_LINE: ${{ secrets.FLUX_LINE }}
+          EVENTS_PUBLISH_KEY: ${{ secrets.EVENTS_PUBLISH_KEY }}
+        run: python3 tools/build_eps.py --family flux --line-env FLUX_LINE --max-calls 150 --budget-s 300
+      - name: flux categories (hourly)
+        id: cats_flux
+        continue-on-error: true
+        env:
+          FLUX_LINE: ${{ secrets.FLUX_LINE }}
+          EVENTS_PUBLISH_KEY: ${{ secrets.EVENTS_PUBLISH_KEY }}
+        run: |
+          M=$((10#$(date -u +%M)))
+          if [ "$M" -ge 10 ]; then echo "not the categories slot (minute $M)"; exit 0; fi
+          python3 tools/build_cats.py --family flux --line-env FLUX_LINE
+          if [ -f cdn/cats_manifest.json ]; then python3 tools/publish_events_http.py cats; fi
+      - name: flux channel guide (trickle)
+        id: guide_flux
+        continue-on-error: true
+        env:
+          FLUX_LINE: ${{ secrets.FLUX_LINE }}
+          EVENTS_PUBLISH_KEY: ${{ secrets.EVENTS_PUBLISH_KEY }}
+        run: |
+          python3 tools/build_famguide.py --family flux --line-env FLUX_LINE --max-calls 90 --budget-s 190 ${{ inputs.guide_publish && '--force-publish' || '' }}
+          if [ -f cdn/chguide_manifest.json ]; then python3 tools/publish_events_http.py chguide; fi
+      - name: Save the builder state
+        if: always()
+        uses: actions/cache/save@v4
+        with:
+          path: cdn-build/family
+          key: family-state-${{ github.run_id }}
+      - name: A step failed this run (its output was not published; the next run is the retry)
+        if: steps.eps_k8.outcome == 'failure' || steps.cats_k8.outcome == 'failure' || steps.guide_k8.outcome == 'failure' || steps.eps_flux.outcome == 'failure' || steps.cats_flux.outcome == 'failure' || steps.guide_flux.outcome == 'failure'
+        run: exit 1
