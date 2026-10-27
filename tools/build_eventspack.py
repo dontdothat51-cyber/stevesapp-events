@@ -20,7 +20,10 @@ ESPN boards failing = exit 1 = no publish = the last good pack stays.
 Pack = {version, generatedAt, boards: [{league, ok, events}], events: [
   {id, league, sport, tier, name, shortName, start (ISO UTC), status: {state: pre|in|post, detail, completed},
    teams: [{key, id, abbr, name, home, keyed}], broadcasters: [raw source names], networks: [canon network names],
-   source: espn|khl|wiki|dazn|weekly}]}
+   source: espn|khl|wiki|dazn|weekly,
+   LIVE NOW 5.1-A (2026-10-26, optional; older builds ignore them): nets: [{n, scope: nat|home|away, type: tv|stream|pkg,
+   lang, region, src: espn|rsn}], win: "<league>:<net>:<kickoffISO>" (same network, same kickoff +-10 min), rights_cc: [CC..],
+   rights_age_d: days since tools/data/rsn.json _meta.review}]}
 RULES: the pack alone NEVER creates a card (NO GHOST LIVES); status decides existence only, never a score; team.key ==
 the team vault key (tools/data/team_keys.json) so a card always finds its crest; networks = ESPN's broadcasters mapped
 to canon names + the table's rights holders for the league; the device attaches ONLY what its server carries.
@@ -192,6 +195,108 @@ def networks_of(comp, league):
 def hints_of(league):
     return table_networks(league)
 
+# ---- LIVE NOW 5.1-A (2026-10-26; docs/LIVENOW51_BRIEF_2026-10-26.md A1-A3; research s.H verified on live responses 10/26) --------
+# A1 the pack keeps ESPN's CARRIER FACTS instead of flattening them away: per event an optional `nets` list of
+#   {n: canon name, scope: nat|home|away, type: tv|stream|pkg, lang, region, src: espn|rsn} from `broadcasts[].market` +
+#   `geoBroadcasts[].type.shortName` / `market.type` / `lang` / `region`. `networks` and `broadcasters` stay EXACTLY as today
+#   (old builds read them; the ghost rule exempts them). A name the BROADCASTERS table maps to None (NBA League Pass, MLB.TV --
+#   team-owned, never a linear channel) still appears in `nets` under its raw name: the box needs "League Pass = the AWAY market
+#   carrier" (Rodney 10/25) even though no channel is ever searched for it. rsn.json networks join with scope home/away, src rsn.
+# A2 window group: events of one league on the SAME per-game network with the same kickoff (+-10 min) share
+#   `win: "<league>:<net>:<kickoffISO>"` (the three Fox 1 PM games; Eddie 10/25). rsn names are team-owned, never shared.
+# A3 rights country: tools/data/rsn.json `rights_cc` per league (owner-reviewable) -> each event gets `rights_cc` and
+#   `rights_age_d` (days since `_meta.review`; entries older than 120 days are still emitted -- the box decides what to do with age).
+SCOPE_OF = {"national": "nat", "home": "home", "away": "away"}
+TYPE_OF = {"tv": "tv", "streaming": "stream", "subscription package": "pkg", "subscription": "pkg"}
+WINDOW_TOL_S = 10 * 60
+RIGHTS_CC = (RSN.get("rights_cc") if isinstance(RSN.get("rights_cc"), dict) else None) or {}
+RIGHTS_REVIEW = ((RSN.get("_meta") or {}) if isinstance(RSN.get("_meta"), dict) else {}).get("review") or ""
+
+def carriers_of(comp):
+    """A1: one entry per carrier name, in ESPN's order (broadcasts first, then geoBroadcasts); a geo entry adds the facts the
+    broadcasts entry did not carry (type / lang / region) and never duplicates the name. Keys with no value are left out."""
+    out = []
+    def add(raw, scope, typ, lang, region):
+        n = (raw or "").strip()
+        if not n: return
+        canon = BROADCASTERS.get(n, n) or n
+        for o in out:
+            if o["n"] == canon:
+                for k, v in (("scope", scope), ("type", typ), ("lang", lang), ("region", region)):
+                    if v and k not in o: o[k] = v
+                return
+        o = {"n": canon}
+        for k, v in (("scope", scope), ("type", typ), ("lang", lang), ("region", region)):
+            if v: o[k] = v
+        o["src"] = "espn"
+        out.append(o)
+    for b in comp.get("broadcasts") or []:
+        scope = SCOPE_OF.get(str(b.get("market") or "").strip().lower())
+        for n in b.get("names") or []: add(n, scope, None, None, None)
+    for g in comp.get("geoBroadcasts") or []:
+        n = ((g.get("media") or {}).get("shortName") or "")
+        scope = SCOPE_OF.get(str(((g.get("market") or {}).get("type")) or "").strip().lower())
+        typ = TYPE_OF.get(str(((g.get("type") or {}).get("shortName")) or "").strip().lower())
+        lang = str(g.get("lang") or "").strip().lower() or None       # audit N9: a non-string must not fail the whole pack
+        region = str(g.get("region") or "").strip().lower() or None
+        add(str(n), scope, typ, lang, region)
+    return out
+
+# audit N8: package / streaming carriers that sit on every game of a night (League Pass at every tip, Sunday Ticket, ESPN+) never make a
+# window -- a window is for a LINEAR network that carries several games at one kickoff (Fox / CBS 1 PM)
+WINDOW_SKIP = re.compile(r"(?i)league pass|sunday ticket|mlb\.tv|nhl\.tv|espn\+|peacock|paramount\+|prime video|apple tv|max$|dazn|fubo|game pass|\.tv$|\bapp$")
+def window_carrier(o):
+    return o.get("src") == "espn" and o.get("type") not in ("pkg", "stream") and not WINDOW_SKIP.search(o["n"])
+
+def rsn_nets(league, teams):
+    """A1: the teams' regional networks with the side they belong to (home team -> home, away team -> away), src rsn."""
+    out = []
+    for t in teams:
+        for n in (RSN.get(league) or {}).get(t.get("key") or "", []) if isinstance(RSN.get(league), dict) else []:
+            if not any(o["n"] == n for o in out): out.append({"n": n, "scope": "home" if t.get("home") else "away", "src": "rsn"})
+    return out
+
+def rights_of(league, now=None):
+    """A3: (rights_cc list, age in days since the table's review date) or (None, None) when the league has no entry."""
+    cc = RIGHTS_CC.get(league)
+    if not isinstance(cc, list) or not cc: return None, None
+    try:
+        rev = dt.datetime.strptime(RIGHTS_REVIEW[:10], "%Y-%m-%d").replace(tzinfo=dt.timezone.utc)
+        age = max(0, ((now or now_utc()) - rev).days)
+    except Exception:
+        age = None
+    return [str(c).upper() for c in cc], age
+
+def window_groups(events, tol_s=WINDOW_TOL_S):
+    """A2 (pure): events of ONE league that share an ESPN per-game carrier (src espn in `nets`) and kick off within tol_s of
+    the group's first kickoff get the same `win`; a group needs two events; an event takes the first group (by network name,
+    then kickoff) that it belongs to. Returns the number of events given a `win`. Deterministic for a given input."""
+    groups = {}   # (league, net) -> list of (start, event)
+    for e in events:
+        s = _start_of(e)
+        if s is None: continue
+        for o in e.get("nets") or []:
+            if not window_carrier(o): continue   # audit N8: linear ESPN-named carriers only
+            groups.setdefault((e.get("league") or "", o["n"]), []).append((s, e))
+    assigned = 0
+    for (league, net), rows in sorted(groups.items(), key=lambda kv: (kv[0][0], kv[0][1])):
+        rows.sort(key=lambda r: (r[0], r[1].get("id") or ""))
+        i = 0
+        while i < len(rows):
+            j = i + 1
+            while j < len(rows) and (rows[j][0] - rows[i][0]).total_seconds() <= tol_s: j += 1
+            if j - i >= 2:
+                win = f"{league}:{net}:{iso(rows[i][0])}"
+                for k in range(i, j):
+                    if "win" not in rows[k][1]: rows[k][1]["win"] = win; assigned += 1
+            i = j
+    return assigned
+
+def pack_receipt(events):
+    """The build-log line the brief asks for: `pack: nets=<n> win=<n> cc=<n>` (events carrying each field)."""
+    return "pack: nets=%d win=%d cc=%d" % (sum(1 for e in events if e.get("nets")), sum(1 for e in events if e.get("win")),
+                                           sum(1 for e in events if e.get("rights_cc")))
+
 def status_of(st):
     return {"state": st.get("state") or "pre", "detail": st.get("shortDetail") or st.get("detail") or "", "completed": bool(st.get("completed"))}
 
@@ -210,40 +315,54 @@ def espn_board(league):
     for e in raw_events:
         if str(e.get("id")) in seen: continue  # a game can sit on two Eastern days' boards
         seen.add(str(e.get("id")))
-        comps = e.get("competitions") or []
-        if not comps: continue
-        c = comps[0]
-        st = (c.get("status") or e.get("status") or {}).get("type") or {}
-        end_iso = ""
-        if len(comps) > 1 and not has_teams:
-            # 9/19 (owner: UFC 331 missing from Live Now): a fight card / golf event is ONE event holding many bouts --
-            # comps[0] is the first early prelim, "Final" by 6 PM, and the whole card read as over. The event-level
-            # status and date rule; the end = the last bout's slot + 3 h (the app's per-sport default is too short).
-            st = (e.get("status") or {}).get("type") or st
-            try:
-                last = max(cc.get("date") or "" for cc in comps)
-                lt = datetime.datetime.strptime(last[:16], "%Y-%m-%dT%H:%M") + datetime.timedelta(hours=3)
-                end_iso = iso(lt)
-            except Exception: end_iso = ""
-        teams = []
-        if has_teams:
-            for cp in c.get("competitors") or []:
-                t = cp.get("team") or {}
-                tid = str(t.get("id") or "")
-                teams.append({"key": keys.get(tid) or slug(t.get("displayName")), "id": tid, "abbr": t.get("abbreviation") or "",
-                              "name": t.get("displayName") or "", "home": cp.get("homeAway") == "home", "keyed": tid in keys})
-        raw, nets = networks_of(c, league)
-        for t in teams:   # 9/25: both teams' regional networks (rsn.json), after the reference's own names
-            for n in (RSN.get(league) or {}).get(t.get("key") or "", []):
-                if n not in nets: nets.append(n)
-        ev = {"id": "espn:" + str(e.get("id")), "league": league, "sport": sport, "tier": tier,
-              "name": e.get("name") or "", "shortName": e.get("shortName") or "",
-              "start": (e.get("date") if (len(comps) > 1 and not has_teams) else None) or c.get("date") or e.get("date") or "", "status": status_of(st),
-              "teams": teams, "broadcasters": raw, "networks": nets, "hints": hints_of(league), "source": "espn"}
-        if end_iso: ev["end"] = end_iso
-        out.append(ev)
+        ev = espn_event(e, league, keys)
+        if ev is not None: out.append(ev)
     if league in NATIONAL: demote_umbrellas(out)
     return out
+
+def espn_event(e, league, keys):
+    """One ESPN scoreboard event -> one pack event (None = no competition). 5.1-A: factored out of espn_board so the offline test
+    (tools/test_eventspack_51.py) and the sample pack run the SAME code on ESPN-shaped fixtures; behaviour unchanged."""
+    sport, lg, tier, extra, has_teams = BOARDS[league]
+    comps = e.get("competitions") or []
+    if not comps: return None
+    c = comps[0]
+    st = (c.get("status") or e.get("status") or {}).get("type") or {}
+    end_iso = ""
+    if len(comps) > 1 and not has_teams:
+        # 9/19 (owner: UFC 331 missing from Live Now): a fight card / golf event is ONE event holding many bouts --
+        # comps[0] is the first early prelim, "Final" by 6 PM, and the whole card read as over. The event-level
+        # status and date rule; the end = the last bout's slot + 3 h (the app's per-sport default is too short).
+        st = (e.get("status") or {}).get("type") or st
+        try:
+            last = max(cc.get("date") or "" for cc in comps)
+            lt = datetime.datetime.strptime(last[:16], "%Y-%m-%dT%H:%M") + datetime.timedelta(hours=3)
+            end_iso = iso(lt)
+        except Exception: end_iso = ""
+    teams = []
+    if has_teams:
+        for cp in c.get("competitors") or []:
+            t = cp.get("team") or {}
+            tid = str(t.get("id") or "")
+            teams.append({"key": keys.get(tid) or slug(t.get("displayName")), "id": tid, "abbr": t.get("abbreviation") or "",
+                          "name": t.get("displayName") or "", "home": cp.get("homeAway") == "home", "keyed": tid in keys})
+    raw, nets = networks_of(c, league)
+    for t in teams:   # 9/25: both teams' regional networks (rsn.json), after the reference's own names
+        for n in (RSN.get(league) or {}).get(t.get("key") or "", []) if isinstance(RSN.get(league), dict) else []:
+            if n not in nets: nets.append(n)
+    ev = {"id": "espn:" + str(e.get("id")), "league": league, "sport": sport, "tier": tier,
+          "name": e.get("name") or "", "shortName": e.get("shortName") or "",
+          "start": (e.get("date") if (len(comps) > 1 and not has_teams) else None) or c.get("date") or e.get("date") or "", "status": status_of(st),
+          "teams": teams, "broadcasters": raw, "networks": nets, "hints": hints_of(league), "source": "espn"}
+    if end_iso: ev["end"] = end_iso
+    # 5.1-A A1 + A3: the carrier facts (optional list; absent when ESPN named nothing and no rsn applies) and the rights country
+    carriers = carriers_of(c) + rsn_nets(league, teams)
+    if carriers: ev["nets"] = carriers
+    cc, age = rights_of(league)
+    if cc:
+        ev["rights_cc"] = cc
+        if age is not None: ev["rights_age_d"] = age
+    return ev
 
 def _start_of(e):
     try: return dt.datetime.strptime(e["start"][:16], "%Y-%m-%dT%H:%M").replace(tzinfo=dt.timezone.utc)
@@ -272,6 +391,9 @@ def demote_umbrellas(events):
         e["networks"] = [n for n in e["networks"] if n not in shared]
         e["broadcasters"] = [n for n in e["broadcasters"] if BROADCASTERS.get(n, n) not in shared and n not in shared]
         e["hints"] = list(dict.fromkeys(list(e.get("hints") or []) + sorted(shared)))
+        if e.get("nets"):   # 5.1-A: the carrier facts follow the same rule (an umbrella is not a per-game fact for the box either)
+            e["nets"] = [o for o in e["nets"] if o["n"] not in shared]
+            if not e["nets"]: del e["nets"]
         demoted += 1
     if demoted: print(f"  umbrella rule: {demoted} {events[0]['league'] if events else ''} games lost a shared network to hints")
     return events
@@ -466,6 +588,7 @@ def main():
     events = uniq
     boards.sort(key=lambda b: b["league"])
     events.sort(key=lambda e: (e["tier"], e["start"]))
+    window_groups(events)   # 5.1-A A2 (after the umbrella rule: a competition-wide name never makes a window)
     live = sum(1 for e in events if e["status"]["state"] == "in")
     unkeyed = sum(1 for e in events for t in e["teams"] if not t["keyed"])
     now = now_utc()
@@ -491,6 +614,7 @@ def main():
     for e in events: by[e["source"]] = by.get(e["source"], 0) + 1
     print(f"events pack {ver}: {len(events)} events ({live} live now) by source {by}, {len(gz)/1024:.0f} KB gz, unkeyed team refs {unkeyed}, "
           f"{len(failed)} boards failed, {time.time()-t0:.1f}s")
+    print("  " + pack_receipt(events))   # 5.1-A: `pack: nets=<n> win=<n> cc=<n>`
 
 if __name__ == "__main__":
     main()

@@ -1,5 +1,24 @@
 {
-  "_": "REGIONAL SPORTS NETWORKS (9/25, Sye 1: Cubs at Red Sox listed only Marquee; his Marquee feed was dead while NESN sat unused). Per team, the network(s) that carry that team's games, in the names channels use. Appended to a game's networks when the reference left them out; the Stick's guide confirmation still decides. Empty = the team streams its own games (no linear RSN). Names as of the 2025-26 seasons.",
+  "_": "REGIONAL SPORTS NETWORKS (9/25, Sye 1: Cubs at Red Sox listed only Marquee; his Marquee feed was dead while NESN sat unused). Per team, the network(s) that carry that team's games, in the names channels use. Appended to a game's networks when the reference left them out; the Stick's guide confirmation still decides. Empty = the team streams its own games (no linear RSN). Names as of the 2025-26 seasons. LIVE NOW 5.1-A (10/26): `_meta.review` = the day this table was last reviewed (the pack emits rights_age_d from it; the box shows nothing market-specific past 120 days); `rights_cc` = per league, the countries whose channels legitimately carry it for our viewers (owner-reviewable; a slot from another country is capped at level 1 on the box unless a trusted guide names the game; a league with no entry = no cap).",
+  "_meta": {"review": "2026-10-26"},
+  "rights_cc": {
+    "nfl": ["US", "CA"],
+    "nba": ["US", "CA"],
+    "wnba": ["US", "CA"],
+    "nhl": ["US", "CA"],
+    "mlb": ["US", "CA"],
+    "mls": ["US", "CA"],
+    "ncaaf": ["US", "CA"],
+    "ncaab": ["US", "CA"],
+    "ucl": ["US", "CA", "UK", "IE", "ES", "DE", "FR", "IT", "PT", "NL", "MX", "AR", "BR", "AU"],
+    "uel": ["US", "CA", "UK", "IE", "ES", "DE", "FR", "IT", "PT", "NL", "MX", "AR", "BR", "AU"],
+    "epl": ["US", "CA", "UK", "IE", "ES", "DE", "FR", "IT", "PT", "NL", "MX", "AR", "BR", "AU", "IN"],
+    "laliga": ["US", "CA", "UK", "IE", "ES", "DE", "FR", "IT", "PT", "NL", "MX", "AR", "BR", "AU"],
+    "seriea": ["US", "CA", "UK", "IE", "ES", "DE", "FR", "IT", "PT", "NL", "MX", "AR", "BR", "AU"],
+    "bundesliga": ["US", "CA", "UK", "IE", "ES", "DE", "FR", "IT", "PT", "NL", "MX", "AR", "BR", "AU"],
+    "ligue1": ["US", "CA", "UK", "IE", "ES", "DE", "FR", "IT", "PT", "NL", "MX", "AR", "BR", "AU"],
+    "ligamx": ["US", "CA", "MX"]
+  },
   "mlb": {
     "athletics": ["NBC Sports California"],
     "atlantabraves": ["FanDuel Sports Network South", "Bally Sports South"],
