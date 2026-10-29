@@ -99,6 +99,26 @@ def api(base, user, pw, action):
         return json.loads(r.read().decode("utf-8", "replace"))
 
 
+FRESH_SKIP_MIN = 12   # audit M3: a family pack younger than this already landed in this window (the clock's dispatch + GitHub's cron)
+
+
+def landed_this_window(fam):
+    """audit M3: two triggers (the server clock's dispatch and GitHub's own cron) often both start a run inside the same 5-min
+    family window, and each would read the family's full lists again. Ask the server (/v1/health, the publish key) how old the
+    family's pack is; younger than FRESH_SKIP_MIN = this window's read already landed -> skip. Any error = read (fail open)."""
+    key = os.environ.get("EVENTS_PUBLISH_KEY", "").strip()
+    if not key: return False
+    url = os.environ.get("EVENTS_PUBLISH_URL", "https://stevesapp.tv/v1/events/publish").replace("/v1/events/publish", "/v1/health")
+    try:
+        req = urllib.request.Request(url, headers={"x-events-key": key, "User-Agent": UA})
+        with urllib.request.urlopen(req, timeout=20) as r:
+            h = json.loads(r.read().decode("utf-8", "replace"))
+        age = (((h or {}).get("slots") or {}).get(fam) or {}).get("ageMin")
+        return isinstance(age, (int, float)) and 0 <= age < FRESH_SKIP_MIN
+    except Exception:
+        return False
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--family", default="k8", choices=sorted(LINE_ENV))
@@ -110,6 +130,12 @@ def main():
     if line.count("|") != 2:
         print(f"::error::{env_name} not set (server|user|pass)"); sys.exit(1)
     base, user, pw = [x.strip().rstrip("/") for x in line.split("|")]
+    # audit M2: GitHub masks the whole secret, not its parts -- an error that quotes the request URL (a server typed without
+    # its scheme, an odd port) would print the login in this PUBLIC repo's logs. Mask each part before any request.
+    for part in (base, user, pw):
+        if part: print(f"::add-mask::{part}")
+    if fam != "k8" and landed_this_window(fam):
+        print(f"::notice::{fam} slots pack already landed this window -- skipped (nothing read, nothing written)"); sys.exit(0)
     try:
         auth = api(base, user, pw, "")
         ui = (auth or {}).get("user_info") or {}

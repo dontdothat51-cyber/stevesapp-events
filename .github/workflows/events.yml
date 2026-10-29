@@ -110,6 +110,7 @@ jobs:
         continue-on-error: true
         env:
           FLUX_LINE: ${{ secrets.FLUX_LINE }}
+          EVENTS_PUBLISH_KEY: ${{ secrets.EVENTS_PUBLISH_KEY }}   # audit M3: only to ask /v1/health whether this window's pack already landed
         run: python3 tools/build_slotspack.py --family flux
       - name: Publish the flux slots pack
         id: flux_pub
@@ -123,6 +124,7 @@ jobs:
         continue-on-error: true
         env:
           MEGA_LINE: ${{ secrets.MEGA_LINE }}
+          EVENTS_PUBLISH_KEY: ${{ secrets.EVENTS_PUBLISH_KEY }}   # audit M3: only to ask /v1/health whether this window's pack already landed
         run: python3 tools/build_slotspack.py --family mega
       - name: Publish the mega slots pack
         id: mega_pub
