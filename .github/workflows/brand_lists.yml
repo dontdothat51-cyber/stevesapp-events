@@ -35,7 +35,7 @@ jobs:
           EVENTS_PUBLISH_KEY: ${{ secrets.EVENTS_PUBLISH_KEY }}
         run: |
           test -n "$TMDB_API_KEY" || { echo "::error::TMDB_API_KEY secret not set"; exit 1; }
-          python3 -u tools/build_brand_lists.py --max-calls 2500 --parity "${{ inputs.parity || 'auto' }}" --cache-dir "${{ runner.temp }}/brand_lists_pages"
+          python3 -u tools/build_brand_lists.py --max-calls 3000 --parity "${{ inputs.parity || 'auto' }}" --cache-dir "${{ runner.temp }}/brand_lists_pages"
       - name: Publish through the server's publish door
         env:
           EVENTS_PUBLISH_KEY: ${{ secrets.EVENTS_PUBLISH_KEY }}

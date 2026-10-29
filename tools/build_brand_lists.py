@@ -18,7 +18,7 @@ rotation. The previous lists come from the publish door (GET /v1/brand_lists/sta
 a door that answers anything but the pack or 404 (= first run) stops the run: publishing without the old dates would drop
 every title in grace.
 
-BUDGET: HARD CAP of TMDB calls per run (--max-calls, default 2,500; every HTTP request counts, retries included). All page-1
+BUDGET: HARD CAP of TMDB calls per run (--max-calls, default 3,000 (10/28: Prime whole every week); every HTTP request counts, retries included). All page-1
 probes run first; if the pages they announce would pass the cap, the run stops BEFORE fetching them and writes nothing.
 Page caches live only in --cache-dir (default: a folder in the run's temp dir), never in the repo.
 
@@ -262,7 +262,7 @@ def load_prev(a):
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--only", help="comma list of brand ids (dry runs); a partial run is never published")
-    ap.add_argument("--max-calls", type=int, default=2500)
+    ap.add_argument("--max-calls", type=int, default=3000)
     ap.add_argument("--cache-dir", default=os.path.join(os.environ.get("RUNNER_TEMP") or tempfile.gettempdir(), "brand_lists_pages"))
     ap.add_argument("--prev"); ap.add_argument("--no-prev", action="store_true")
     ap.add_argument("--out", default=CDN)
