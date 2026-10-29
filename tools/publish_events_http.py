@@ -15,8 +15,9 @@ DOOR = os.environ.get("EVENTS_PUBLISH_URL", "https://stevesapp.tv/v1/events/publ
 
 
 def main():
-    # 9/23: slots + catalog ride the same door; 10/4 (0.17.44): the family builder's categories (cats) and channel guide (chguide)
-    kind = sys.argv[1] if len(sys.argv) > 1 and sys.argv[1] in ("events", "slots", "catalog", "cats", "chguide") else "events"
+    # 9/23: slots + catalog ride the same door; 10/4 (0.17.44): the family builder's categories (cats) and channel guide (chguide);
+    # 10/28 (Phase 4): the weekly brand lists (brand_lists, tools/build_brand_lists.py)
+    kind = sys.argv[1] if len(sys.argv) > 1 and sys.argv[1] in ("events", "slots", "catalog", "cats", "chguide", "brand_lists") else "events"
     door = DOOR.replace("/v1/events/publish", f"/v1/{kind}/publish")
     key = os.environ.get("EVENTS_PUBLISH_KEY", "").strip()
     if not key:
@@ -44,7 +45,8 @@ def main():
     except Exception as e:  # audit: DNS / timeout / refused -> a clean annotation, not a traceback
         print(f"::error::publish door unreachable: {type(e).__name__} {str(e)[:160]}"); sys.exit(1)
     if out.get("ok"):
-        detail = (f"{man['events']} events, {man['live']} live, failed {man['failed']}" if kind == "events"
+        detail = (" ".join(f"{k} {c['movies']}/{c['series']}" for k, c in man['counts'].items()) + f" (TMDB calls {man.get('calls')})" if kind == "brand_lists"
+                  else f"{man['events']} events, {man['live']} live, failed {man['failed']}" if kind == "events"
                   else f"{man['slots']} slots in {man['buckets']} buckets" if kind == "slots"
                   else f"{man['family']}: " + ("unchanged (checked)" if out.get("unchanged") else "ids " + ", ".join(f"{k} {v}" for k, v in man['counts'].items())) if kind == "cats"
                   else f"{man['family']}: {man['keys']} guide ids, {man['streams']} channels, {man['progs']} programmes" if kind == "chguide"
