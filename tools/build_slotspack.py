@@ -12,14 +12,53 @@ Output: cdn/slots.json.gz  {version, generatedAt, buckets:[{id}], slots:[[stream
         cdn/slots_manifest.json  {version, file, sha256, bytes, generatedAt, slots, buckets}
 A provider error (auth, busy, 5xx) exits non-zero and writes NOTHING -- the last good pack stays; the builder never
 retries in a loop (the next scheduled run is the retry).
+
+10/28 PER FAMILY (docs/SLOTS_PER_FAMILY_BRIEF_2026-10-28.md in the private repo): `--family k8|flux|mega` reads that family's
+builder line (k8 = SLOTS_LINE, flux = FLUX_LINE, mega = MEGA_LINE -- the owner's own line, LIST reads only, never a stream) with
+the same two list calls. k8 is BYTE-FOR-BYTE today's run: same env, same bucket rule, same files (cdn/slots.json.gz +
+cdn/slots_manifest.json), no `family` field -- the door files it under the legacy keys every 0.17.82/83 box reads. Any other
+family writes cdn/fam/<family>/slots.json.gz + slots_manifest.json (manifest `family` field; `file` stays "slots.json.gz", the
+door's name check) and picks its buckets with the BOX's content rule (EventParser.isEventBucket + looksLikeEvent, RefreshEngine.
+bucketFlags): the bucket's words, OR >= 3 event-shaped names, OR >= 8 names of which half are event-shaped. The legacy rule only
+knows a leading "HH:MM " clock, and the bracket-stamped slot names other families write ("... LIVE 03 [A vs. B (YYYY-MM-DD
+HH:MM:SS)]") would never be read. A family whose line is not set exits 0 with a ::notice:: (nothing written, nothing published).
 """
-import datetime as dt, gzip, hashlib, json, os, re, sys, urllib.request, urllib.error
+import argparse, datetime as dt, gzip, hashlib, json, os, re, sys, urllib.request, urllib.error
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 CDN = os.path.join(ROOT, "cdn"); os.makedirs(CDN, exist_ok=True)
 BUCKET_WORDS = re.compile(r"(?i)\b(PPV|EVENT|EVENTS|REPLAY|REPLAYS|PAY PER VIEW)\b")
 TIME_PREFIX = re.compile(r"^\s*(\d{1,2})[:.](\d{2})\s+(?=\S)")
 UA = "Mozilla/5.0 (Linux; Android) StevesApp"
+LINE_ENV = {"k8": "SLOTS_LINE", "flux": "FLUX_LINE", "mega": "MEGA_LINE"}   # the Worker's EPS_LINE_ENV, same three families
+
+# 10/28: the box's own "looks like a scheduled matchup" rule (core-parser EventParser.looksLikeEvent), ported regex for regex:
+# a leading clock, OR an "A vs B" plus any clock shape (bracket stamp, bare date-time, HH:MM with am/pm/zone, a bare "7pm").
+_ZONES = ["GMT", "BST", "UTC", "CET", "CEST", "EET", "EEST", "WET", "WEST", "ET", "EDT", "EST", "CT", "CDT", "CST", "MT", "MDT", "MST",
+          "PT", "PDT", "PST", "AEST", "AEDT", "IST", "JST", "KST", "HKT", "SAST", "MSK", "BRT", "ART", "NDT", "NST", "ADT", "AST"]
+_ZONE_ALT = "|".join(sorted(_ZONES, key=len, reverse=True))
+_TS = re.compile(r"\((\d{4})-(\d{2})-(\d{2}) (\d{2}):(\d{2}):\d{2}\)")
+_TS_BARE = re.compile(r"(?:@\s*)?(\d{4})-(\d{2})-(\d{2})\s+(\d{1,2}):(\d{2})(?::\d{2})?")
+_TIME_ONLY = re.compile(r"(?i)(?<![\d:.])(\d{1,2})[:.](\d{2})\s*(am|pm)?(?:\s*\(?((?-i:" + _ZONE_ALT + r"))\)?(?![A-Za-z]))?(?![\d:.])")
+_TIME_HOUR = re.compile(r"(?i)(?<![\d:.])(\d{1,2})\s*(am|pm)\b(?![\d:.])")
+_VS = re.compile(r"(?i)\s+(?:vs\.?|v\.?|versus|@|at|x|-|\u2013|\u2014)\s+")
+
+
+def looks_like_event(name):
+    if TIME_PREFIX.search(name): return True
+    if not _VS.search(name): return False
+    return bool(_TS.search(name) or _TS_BARE.search(name) or _TIME_ONLY.search(name) or _TIME_HOUR.search(name))
+
+
+def is_bucket(cat_name, rows, content):
+    """k8 (content=False): the 9/23 rule, unchanged. Other families: the box's bucketFlags rule (see the header)."""
+    if BUCKET_WORDS.search(cat_name): return True
+    names = [str(s.get("name") or "") for s in rows]
+    if not content:
+        timed = sum(1 for n in names if TIME_PREFIX.search(n))
+        return len(rows) >= 8 and timed / len(rows) >= 0.5
+    ev = sum(1 for n in names if looks_like_event(n))
+    return ev >= 3 or (len(names) >= 8 and ev / len(names) >= 0.5)
 
 
 # 9/23 PHASE 3: the provider's brand phrase is not part of a channel's name, and it must not sit in our storage naming
@@ -61,9 +100,15 @@ def api(base, user, pw, action):
 
 
 def main():
-    line = os.environ.get("SLOTS_LINE", "").strip()
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--family", default="k8", choices=sorted(LINE_ENV))
+    fam = ap.parse_args().family
+    env_name = LINE_ENV[fam]
+    line = os.environ.get(env_name, "").strip()
+    if fam != "k8" and not line:
+        print(f"::notice::{env_name} not set -- {fam} slots skipped (nothing written)"); sys.exit(0)
     if line.count("|") != 2:
-        print("::error::SLOTS_LINE not set (server|user|pass)"); sys.exit(1)
+        print(f"::error::{env_name} not set (server|user|pass)"); sys.exit(1)
     base, user, pw = [x.strip().rstrip("/") for x in line.split("|")]
     try:
         auth = api(base, user, pw, "")
@@ -85,8 +130,7 @@ def main():
     for c in cats:
         cid, name = str(c.get("category_id")), str(c.get("category_name") or "")
         rows = by_cat.get(cid) or []
-        timed = sum(1 for s in rows if TIME_PREFIX.search(str(s.get("name") or "")))
-        if BUCKET_WORDS.search(name) or (len(rows) >= 8 and timed / len(rows) >= 0.5):
+        if is_bucket(name, rows, content=(fam != "k8")):
             buckets.append({"id": cid, "name": name})
     bucket_ids = {b["id"] for b in buckets}
     slots = []
@@ -100,12 +144,17 @@ def main():
     now = dt.datetime.now(dt.timezone.utc)
     ver = now.strftime("%Y%m%d%H%M")
     pack = {"version": ver, "generatedAt": now.strftime("%Y-%m-%dT%H:%M:%SZ"), "buckets": [{"id": b["id"]} for b in buckets], "slots": slots}
+    if fam != "k8" and not (100 <= len(slots) <= 30000):   # the door's own range (worker publishEvents): say so here, write nothing
+        print(f"::error::{fam}: {len(slots)} slots in {len(buckets)} buckets is outside the door's 100..30000 -- nothing written"); sys.exit(1)
     gz = gzip.compress(json.dumps(pack, ensure_ascii=False, separators=(",", ":")).encode("utf-8"), mtime=0)
-    open(os.path.join(CDN, "slots.json.gz"), "wb").write(gz)
+    out = CDN if fam == "k8" else os.path.join(CDN, "fam", fam)
+    os.makedirs(out, exist_ok=True)
+    open(os.path.join(out, "slots.json.gz"), "wb").write(gz)
     man = {"version": ver, "file": "slots.json.gz", "sha256": hashlib.sha256(gz).hexdigest(), "bytes": len(gz),
            "generatedAt": pack["generatedAt"], "slots": len(slots), "buckets": len(buckets)}
-    json.dump(man, open(os.path.join(CDN, "slots_manifest.json"), "w", encoding="utf-8"), indent=1)
-    print(f"slots pack {ver}: {len(slots)} slots in {len(buckets)} buckets of {len(cats)} categories ({len(streams)} streams read), {len(gz)/1024:.0f} KB gz")
+    if fam != "k8": man["family"] = fam   # k8 keeps today's manifest exactly (the door defaults to k8)
+    json.dump(man, open(os.path.join(out, "slots_manifest.json"), "w", encoding="utf-8"), indent=1)
+    print(f"{'' if fam == 'k8' else fam + ' '}slots pack {ver}: {len(slots)} slots in {len(buckets)} buckets of {len(cats)} categories ({len(streams)} streams read), {len(gz)/1024:.0f} KB gz")
 
 
 if __name__ == "__main__":

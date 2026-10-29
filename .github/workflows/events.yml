@@ -9,18 +9,26 @@
 # 5 minutes. The door skips an older-or-same version, so overlapping runs never fight.
 # Secrets: EVENTS_PUBLISH_KEY (single-purpose: it can publish a pack and nothing else) and SLOTS_LINE (a provider login
 # used only to read channel names; never printed).
+# 10/28 SLOTS PER FAMILY (job slots-families below): the same event-bucket channel names for the OTHER families, each from its
+# own builder line -- flux = FLUX_LINE, mega = MEGA_LINE (the owner's own line; list reads only, never a stream). A line not set
+# = that family is skipped with a notice. Cadence: game hours (12:00-23:59 ET) every 30 min, otherwise 03:00 and 10:00 ET (the
+# off-hours members of the seven builds). The k8 read above stays every 5 min, exactly as before. The family reads run in their
+# OWN job AFTER this one, in their own concurrency group, so they can never delay an events pack (this run's or the next one's).
 name: events
 on:
   schedule:
     - cron: '*/5 * * * *'
   workflow_dispatch: {}
-concurrency:
-  group: events-pack
-  cancel-in-progress: false
 jobs:
   events-pack:
     runs-on: ubuntu-latest
     timeout-minutes: 14
+    # 10/28: the group moved from the workflow to the job (same name, same rule) so the slots-families job never holds it
+    concurrency:
+      group: events-pack
+      cancel-in-progress: false
+    outputs:
+      famslots: ${{ steps.gate.outputs.famslots }}
     steps:
       - uses: actions/checkout@v4
       # 9/23 PHASE 1 (audit): the catalogue-hour gate runs FIRST, so a slow provider read above it (3 x 180 s timeouts on
@@ -31,6 +39,11 @@ jobs:
           H=$(TZ=America/New_York date +%H); M=$((10#$(TZ=America/New_York date +%M)))
           case "$H" in 03|10|12|14|16|18|20) hour=1;; *) hour=0;; esac
           if [ "$hour" = 1 ] && [ "$M" -lt 5 ]; then echo "catalog=true" >> "$GITHUB_OUTPUT"; echo "ET $H:$M -> catalogue read this run"; else echo "catalog=false" >> "$GITHUB_OUTPUT"; echo "ET $H:$M -> no catalogue this run"; fi
+          # 10/28 the family slots windows (worker/src/slots.js slotsDue is the same table -- keep the two in step)
+          HH=$((10#$H)); fam=0
+          if [ "$HH" -ge 12 ] && { [ "$M" -lt 5 ] || { [ "$M" -ge 30 ] && [ "$M" -lt 35 ]; }; }; then fam=1; fi
+          if { [ "$HH" = 3 ] || [ "$HH" = 10 ]; } && [ "$M" -lt 5 ]; then fam=1; fi
+          if [ "$fam" = 1 ]; then echo "famslots=true" >> "$GITHUB_OUTPUT"; echo "ET $H:$M -> family slots read this run"; else echo "famslots=false" >> "$GITHUB_OUTPUT"; fi
       - name: Build the events pack from the ESPN boards
         run: python3 tools/build_eventspack.py
       - name: Publish through the server's publish door
@@ -77,4 +90,47 @@ jobs:
         run: python3 -c "import json; m=json.load(open('cdn/events_manifest.json')); print('events pack', m['version'], m['events'], 'events,', m['live'], 'live, boards failed:', m['failed'])"
       - name: Slots read failed this run (the provider answered badly; nothing was published for slots; the catalogue still ran)
         if: steps.slots.outcome == 'failure'
+        run: exit 1
+
+  # 10/28 SLOTS PER FAMILY: flux + mega, one list read each (get_live_categories + get_live_streams), only in the gate's slots.
+  # needs: = starts after the events job (so the events pack is never waiting on a provider); !cancelled() = also after a
+  # failed k8 slots read (that job ends red on purpose). Own group: the next events run never queues behind this job.
+  slots-families:
+    needs: events-pack
+    if: ${{ !cancelled() && needs.events-pack.outputs.famslots == 'true' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    concurrency:
+      group: slots-families
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@v4
+      - name: flux slots pack
+        id: flux
+        continue-on-error: true
+        env:
+          FLUX_LINE: ${{ secrets.FLUX_LINE }}
+        run: python3 tools/build_slotspack.py --family flux
+      - name: Publish the flux slots pack
+        id: flux_pub
+        if: steps.flux.outcome == 'success' && hashFiles('cdn/fam/flux/slots_manifest.json') != ''
+        continue-on-error: true
+        env:
+          EVENTS_PUBLISH_KEY: ${{ secrets.EVENTS_PUBLISH_KEY }}
+        run: python3 tools/publish_events_http.py slots --family flux
+      - name: mega slots pack
+        id: mega
+        continue-on-error: true
+        env:
+          MEGA_LINE: ${{ secrets.MEGA_LINE }}
+        run: python3 tools/build_slotspack.py --family mega
+      - name: Publish the mega slots pack
+        id: mega_pub
+        if: steps.mega.outcome == 'success' && hashFiles('cdn/fam/mega/slots_manifest.json') != ''
+        continue-on-error: true
+        env:
+          EVENTS_PUBLISH_KEY: ${{ secrets.EVENTS_PUBLISH_KEY }}
+        run: python3 tools/publish_events_http.py slots --family mega
+      - name: A family slots read or publish failed this run (nothing was published for it; the other family still ran)
+        if: steps.flux.outcome == 'failure' || steps.mega.outcome == 'failure' || steps.flux_pub.outcome == 'failure' || steps.mega_pub.outcome == 'failure'
         run: exit 1
