@@ -1,9 +1,9 @@
 # Steve's App BRAND MASTER LISTS (Phase 4, 2026-10-28). Weekly (Sunday 09:00 UTC) + on demand: TMDB discover "where to watch"
 # (US, subscription) per brand door -- Netflix, Apple TV+, Disney+, Prime Video, Paramount+, Max, Peacock, Crunchyroll,
-# Discovery+, and Marvel (Marvel Studios on Disney+) -- movies and series apart, TMDB ids only, with a 28-day grace so a door
+# Discovery+, Hulu, Starz, AMC+, and Marvel (Marvel Studios on Disney+) -- movies and series apart, TMDB ids only, with a 28-day grace so a door
 # does not flicker with the weekly rotation. Handed to the app's server through its publish door, which validates and stores it;
 # the private brain build merges it into the brand table. Data provided by JustWatch (via TMDB).
-# HARD CAP: 2,500 TMDB calls per run (the builder counts every request and stops before fetching past it; Prime's date slices
+# HARD CAP: 3,500 TMDB calls per run (the builder counts every request and stops before fetching past it; Prime's date slices
 # rotate across two runs when the whole pull would not fit). Page caches live in the runner's temp dir only; nothing is committed.
 # Secrets: TMDB_API_KEY (read-only TMDB key; never printed) and EVENTS_PUBLISH_KEY (single-purpose: it can publish a pack and
 # read back the last brand lists for the grace dates, nothing else).
@@ -29,13 +29,13 @@ jobs:
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
-      - name: Build the brand lists (TMDB, capped at 2,500 calls)
+      - name: Build the brand lists (TMDB, capped at 3,500 calls)
         env:
           TMDB_API_KEY: ${{ secrets.TMDB_API_KEY }}
           EVENTS_PUBLISH_KEY: ${{ secrets.EVENTS_PUBLISH_KEY }}
         run: |
           test -n "$TMDB_API_KEY" || { echo "::error::TMDB_API_KEY secret not set"; exit 1; }
-          python3 -u tools/build_brand_lists.py --max-calls 3000 --parity "${{ inputs.parity || 'auto' }}" --cache-dir "${{ runner.temp }}/brand_lists_pages"
+          python3 -u tools/build_brand_lists.py --max-calls 3500 --parity "${{ inputs.parity || 'auto' }}" --cache-dir "${{ runner.temp }}/brand_lists_pages"
       - name: Publish through the server's publish door
         env:
           EVENTS_PUBLISH_KEY: ${{ secrets.EVENTS_PUBLISH_KEY }}

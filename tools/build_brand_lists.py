@@ -4,7 +4,8 @@
 What each brand door should hold: every title the service streams by SUBSCRIPTION in the US, from TMDB discover
 (`with_watch_providers` + `watch_region=US` + `with_watch_monetization_types=flatrate`; the where-to-watch data TMDB gets
 from JustWatch), movies and series apart, plus the company-id unions the plan keeps (Apple Studios, four Netflix ids) and
-Marvel = Marvel Studios (company 420) on Disney+. Ids only -- no title text, no provider data, no category names.
+Marvel = Marvel Studios (company 420) on Disney+. Brands: Apple TV+, Netflix, Disney+, Prime Video, Paramount+, Max, Peacock,
+Crunchyroll, Discovery+, Hulu, Starz, AMC+, Marvel. Ids only -- no title text, no provider data, no category names.
 
 Output cdn/brand_lists.json.gz =
   {schema:1, version, generatedAt, region:"US", graceDays:28,
@@ -18,7 +19,7 @@ rotation. The previous lists come from the publish door (GET /v1/brand_lists/sta
 a door that answers anything but the pack or 404 (= first run) stops the run: publishing without the old dates would drop
 every title in grace.
 
-BUDGET: HARD CAP of TMDB calls per run (--max-calls, default 3,000 (10/28: Prime whole every week); every HTTP request counts, retries included). All page-1
+BUDGET: HARD CAP of TMDB calls per run (--max-calls, default 3,500 (10/28: Prime whole every week; 10/30: +Hulu/Starz/AMC+ ~330 calls on the ~2,834); every HTTP request counts, retries included). All page-1
 probes run first; if the pages they announce would pass the cap, the run stops BEFORE fetching them and writes nothing.
 Page caches live only in --cache-dir (default: a folder in the run's temp dir), never in the repo.
 
@@ -53,6 +54,10 @@ BRANDS = [
     {"id": "peacock", "door": "PEACOCK", "name": "Peacock", "providers": [386, 387], "companies": []},
     {"id": "crunchyroll", "door": "CRUNCHYROLL", "name": "Crunchyroll", "providers": [283], "companies": []},
     {"id": "discovery", "door": "DISCOVERY", "name": "Discovery+", "providers": [520], "companies": []},
+    # 10/30: Hulu, Starz, AMC+ (plain subscription ids, verified against /watch/providers/movie US; not the Amazon/Apple/Roku channel ids)
+    {"id": "hulu", "door": "HULU", "name": "Hulu", "providers": [15], "companies": []},
+    {"id": "starz", "door": "STARZ", "name": "Starz", "providers": [43], "companies": []},
+    {"id": "amcplus", "door": "AMCPLUS", "name": "AMC+", "providers": [526], "companies": []},
     # Marvel is not a service: Marvel Studios (company 420) AND on Disney+ (337), movies only
     {"id": "marvel", "door": "MARVEL", "name": "Marvel", "providers": [337], "companies": [], "and_company": 420, "kinds": ["movie"]},
 ]
@@ -262,7 +267,7 @@ def load_prev(a):
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--only", help="comma list of brand ids (dry runs); a partial run is never published")
-    ap.add_argument("--max-calls", type=int, default=3000)
+    ap.add_argument("--max-calls", type=int, default=3500)
     ap.add_argument("--cache-dir", default=os.path.join(os.environ.get("RUNNER_TEMP") or tempfile.gettempdir(), "brand_lists_pages"))
     ap.add_argument("--prev"); ap.add_argument("--no-prev", action="store_true")
     ap.add_argument("--out", default=CDN)
